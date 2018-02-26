@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+      <meta charset="utf-8">
+      <title>D3 Page Template</title>
+      <script type="text/javascript" src="d3.js"></script>
+      <style type="text/css">
+            .axis path,
+            .axis line {
+                stroke: teal;
+                shape-rendering: crispEdges;
+            }
+
+            .line {
+              fill: none;
+              stroke: teal;
+              stroke-width: 0.5;
+            }
+
+            p {
+              text-decoration: underline;
+              font-size: 10px;
+            }
+
+      </style>
+  </head>
+  <body>
+      <script type="text/javascript">
+        var w = 500;
+        var h = 300;
+        var padding = 40;
+        var r = 2;
+        var xScale, yScale, women_line, men_line, linear_fit_women, linear_fit_men, dataset = [], xAxis, yAxis, men_dataset = [], women_dataset = [], tmp_dataset = [];
+
+
+        d3.csv("marathon.csv", function(error, data) {
+          if (error) {
+            console.log(error);
+          } else {
+            dataset = data;
+          }
+          //Change time to minutes
+          for (i = 0; i < dataset.length; i++) { 
+            var tmp_time = dataset[i]['Time'];
+            var a = tmp_time.split(':'); // split it at the colons
+            dataset[i]['Time'] = parseFloat((+a[0]) * 60 + (+a[1]) + parseFloat("0." + a[2])*(100/60));
+            if(dataset[i]["Gender"] === "men"){
+              men_dataset.push(dataset[i]);
+            } 
+            if (dataset[i]["Gender"] === "women"){
+              women_dataset.push(dataset[i]);
+            }
+          }
+          
+          tmp_dataset = dataset;
+
+                //Create scale functions
+          xScale = d3.scaleTime()
+                         .domain([d3.min(tmp_dataset, function(d) { return parseInt(d["Year"]); }), d3.max(tmp_dataset, function(d) { return parseInt(d["Year"]); })])
+                         .range([padding, w - padding * 2]);
+
+          yScale = d3.scaleLinear()
+                         .domain([d3.min(tmp_dataset, function(d) { return d["Time"]; }), d3.max(tmp_dataset, function(d) { return d["Time"]; })])
+                         .range([h - padding, padding]);
+          
+          xAxis = d3.axisBottom()
+                        .scale(xScale)
+                        .ticks(5)
+                        .tickFormat(d3.format("d"));
+
+          yAxis = d3.axisLeft()
+                        .scale(yScale)
+                        .ticks(5);
+
+          women_line = d3.line()
+                        .defined(function(d) { return d["Gender"] === "women"; })
+                        .x(function(d) { return xScale(parseInt(d["Year"])); })
+                        .y(function(d) { return yScale(d["Time"]); });
+
+          men_line = d3.line()
+                        .defined(function(d) { return d["Gender"] === "men"; })
+                        .x(function(d) { return xScale(parseInt(d["Year"])); })
+                        .y(function(d) { return yScale(d["Time"]); });
+
+          linear_fit_men = d3.line()
+                        .defined(function(d) { return d["Gender"] === "men"; })
+                        .x(function(d) { return xScale(parseInt(d["Year"])); })
+                        .y(function(d) { return yScale((parseInt(d["Year"])* (-0.290181208508)) + 709.838068577); });
+
+          linear_fit_women = d3.line()
+                        .defined(function(d) { return d["Gender"] === "women"; })
+                        .x(function(d) { return xScale(parseInt(d["Year"])); })
+                        .y(function(d) { return yScale((parseInt(d["Year"])* (-0.932674227416)) + 2013.25314849); });
+
+            //Create SVG element
+          var svg = d3.select("body")
+                .append("svg")
+                .attr("width", w)
+                .attr("height", h);
+
+          svg.append("path")
+              .datum(tmp_dataset)
+              .attr("class", "line")
+              .attr("d", women_line);
+
+          svg.append("path")
+              .datum(tmp_dataset)
+              .attr("class", "line")
+              .attr("d", men_line);
+
+          svg.append("path")
+              .datum(tmp_dataset)
+              .attr("class", "line")
+              .attr("d", linear_fit_women);
+
+          svg.append("path")
+              .datum(tmp_dataset)
+              .attr("class", "line")
+              .attr("d", linear_fit_men);
+          
+          //Create circles
+          svg.selectAll("circle")
+             .data(tmp_dataset)
+             .enter()
+             .append("circle")
+             .attr("cx", function(d) {
+                return xScale(parseInt(d["Year"]));
+             })
+             .attr("cy", function(d) {
+                return yScale(d["Time"]);
+             })
+             .attr("r", r)
+             .append("title")
+                    .text(function(d) {
+                      var date = new Date(null);
+                      date.setSeconds(d["Time"] * 60); // specify value for SECONDS here
+                      var result = date.toISOString().substr(11, 8);
+                      return "Marathon winner of " + d["Year"] + " was " + d["Athlete"] + " finishing in " + result + ".";
+                    });
+
+          svg.append("g")
+              .attr("class", "axis")
+              .attr("transform", "translate(0," + (h - padding) + ")")
+              .call(xAxis);
+
+          // text label for the x axis
+          svg.append("text")             
+              .attr("transform", "translate(" + (w/2 - padding/2) + "," + (h - padding/3) + ")")
+              .style("text-anchor", "middle")
+              .style("font-size", "10px")
+              .text("Year");
+
+          svg.append("g")
+              .attr("class", "axis")
+              .attr("transform", "translate(" +  padding + ",0)")
+              .call(yAxis);
+
+          // text label for the y axis
+          svg.append("text")             
+              .attr("x", (-h/2))
+              .attr("y", (padding/3))
+              .attr("transform", "rotate(270)")
+              .style("text-anchor", "middle")
+              .style("font-size", "10px")
+              .text("Time (in minutes)");
+
+          svg.append("text")
+              .attr("x", (w / 2) - (padding / 2))             
+              .attr("y", h - padding/12)
+              .attr("text-anchor", "middle")  
+              .style("font-size", "8px") 
+              .text("Winning time (in minutes) for an annual marathon event, seperately for men and women. Also shown are the straight line approximations.");
+
+          svg.append("text")
+              .attr("x", 2*(w/3) - (padding / 2))             
+              .attr("y", 2*(h/7) - (padding / 3))
+              .attr("text-anchor", "middle")
+              .attr("class", "women_leg")  
+              .style("font-size", "12px") 
+              .text("Women");
+
+          svg.append("text")
+              .attr("x", w/4 - (padding / 2))             
+              .attr("y", h/2 - (padding / 3))
+              .attr("text-anchor", "middle")
+              .attr("class", "men_leg")    
+              .style("font-size", "12px") 
+              .text("Men");
+
+          
+          //On click, update with new data      
+          d3.selectAll("p")
+            .on("click", function() {
+
+              //See which p was clicked
+              var paragraphID = d3.select(this).attr("class");
+
+              if(paragraphID === "men") {
+                tmp_dataset = men_dataset;
+                var women_leg = svg.selectAll(".women_leg");
+
+                women_leg.text("");
+
+                var men_leg = svg.selectAll(".men_leg");
+
+                men_leg.text("Men");
+              }
+              else if(paragraphID === "women") {
+                tmp_dataset = women_dataset;
+                var men_leg = svg.selectAll(".men_leg");
+
+                men_leg.text("");
+
+                var women_leg = svg.selectAll(".women_leg");
+
+                women_leg.text("Women");
+              }
+              else if (paragraphID === "all"){
+                tmp_dataset = dataset;
+
+                var men_leg = svg.selectAll(".men_leg");
+
+                men_leg.text("Men");
+
+                var women_leg = svg.selectAll(".women_leg");
+
+                women_leg.text("Women");
+              }
+
+                var cir = svg.selectAll("circle")
+                             .data(tmp_dataset);
+
+                cir.exit().remove();
+
+                cir.enter()
+                  .append("circle")
+                  .merge(cir)
+                  .attr("cx", function(d) {
+                    return xScale(parseInt(d["Year"]));
+                 })
+                 .attr("cy", function(d) {
+                    return yScale(d["Time"]);
+                 })
+                 .attr("r", r);
+
+                 cir.select("title")
+                  .text(function(d) {
+                    var date = new Date(null);
+                    date.setSeconds(d["Time"] * 60); // specify value for SECONDS here
+                    var result = date.toISOString().substr(11, 8);
+                    return "Marathon winner of " + d["Year"] + " was " + d["Athlete"] + " finishing in " + result + ".";
+                  });
+
+                svg.selectAll(".line")
+                  .data(tmp_dataset)
+                  .attr("d", women_line);
+
+
+                svg.selectAll(".line")
+                  .data(tmp_dataset)
+                  .attr("d", linear_fit_women);
+
+                svg.selectAll(".line")
+                  .data(tmp_dataset)
+                  .attr("d", men_line);
+
+
+                svg.selectAll(".line")
+                  .data(tmp_dataset)
+                  .attr("d", linear_fit_men);
+
+                svg.append("path")
+                  .datum(tmp_dataset)
+                  .attr("class", "line")
+                  .attr("d", men_line);
+
+                svg.append("path")
+                  .datum(tmp_dataset)
+                  .attr("class", "line")
+                  .attr("d", linear_fit_men);
+
+                svg.append("path")
+                  .datum(tmp_dataset)
+                  .attr("class", "line")
+                  .attr("d", women_line);
+
+                svg.append("path")
+                  .datum(tmp_dataset)
+                  .attr("class", "line")
+                  .attr("d", linear_fit_women);
+          });
+        });
+      </script>
+      <p class="all">Show all times.</p>
+      <p class="women">Show time for women.</p>
+      <p class="men">Show time for men.</p>
+  </body>
+</html>
